@@ -94,9 +94,26 @@ window.getTotalWords = function() {
 };
 
 window.isUnlocked = function(item) {
-  const maxKey = 'diko_maxwords_' + (window.FID||'');
-  const historicalMax = parseInt(localStorage.getItem(maxKey)||'0');
-  return historicalMax >= item.unlock;
+  if (item.unlock === 0) return true;
+  // Check permanent unlocks stored in user profile
+  const permaKey = 'diko_unlocked_' + (window.FID||'');
+  const unlocked = JSON.parse(localStorage.getItem(permaKey)||'[]');
+  return unlocked.includes(item.id);
+};
+
+window._grantPermanentUnlocks = function(total) {
+  if (!window.FID) return;
+  const permaKey = 'diko_unlocked_' + window.FID;
+  const unlocked = JSON.parse(localStorage.getItem(permaKey)||'[]');
+  const allItems = [...window.SHOP_ITEMS.banners,...window.SHOP_ITEMS.flairs,...window.SHOP_ITEMS.borders];
+  let changed = false;
+  allItems.forEach(item => {
+    if (item.unlock > 0 && total >= item.unlock && !unlocked.includes(item.id)) {
+      unlocked.push(item.id);
+      changed = true;
+    }
+  });
+  if (changed) localStorage.setItem(permaKey, JSON.stringify(unlocked));
 };
 
 window.getBannerCSS = function(banner) {
@@ -779,15 +796,16 @@ window.goToTopLang = function() {
 
 window.checkNewUnlocks = function(total) {
   if (!window.FID) return;
-  const maxKey = 'diko_maxwords_' + window.FID;
-  const prevMax = parseInt(localStorage.getItem(maxKey)||'0');
-  const newMax = Math.max(prevMax, total);
-  localStorage.setItem(maxKey, String(newMax));
+  // Grant permanent unlocks based on CURRENT total
+  _grantPermanentUnlocks(total);
+  // Notify only once per item
   const notifKey = 'diko_notified_' + window.FID;
   const notified = JSON.parse(localStorage.getItem(notifKey)||'[]');
+  const permaKey = 'diko_unlocked_' + window.FID;
+  const unlocked = JSON.parse(localStorage.getItem(permaKey)||'[]');
   const allItems = [...window.SHOP_ITEMS.banners,...window.SHOP_ITEMS.flairs,...window.SHOP_ITEMS.borders];
   allItems.forEach(item => {
-    if (item.unlock > 0 && newMax >= item.unlock && !notified.includes(item.id)) {
+    if (item.unlock > 0 && unlocked.includes(item.id) && !notified.includes(item.id)) {
       notified.push(item.id);
       setTimeout(() => toast('🎉 Unlocked: ' + item.name + '!', 'success'), 600);
     }
@@ -1871,7 +1889,7 @@ window.updateEditAvatarPreview = function() {
 window.handleAvatarUpload = function(input) {
   const file = input.files[0];
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) { toast('Image too large (max 2 MB)'); return; }
+  if (file.size > 10 * 1024 * 1024) { toast('Image too large (max 10 MB)'); return; }
   const reader = new FileReader();
   reader.onload = async (e) => {
     const base64 = e.target.result;
@@ -2484,7 +2502,7 @@ textarea.fld { resize: none; min-height: 100px; line-height: 1.6; }
 }
 .qz-setup-wrap::-webkit-scrollbar { display:none; }
 .qz-setup-inner {
-  flex:1; overflow:hidden; padding-bottom:calc(var(--nav-h) + 12px);
+  flex:1; overflow:hidden; padding-bottom:4px;
   display:flex; flex-direction:column;
 }
 .qz-setup-inner::-webkit-scrollbar { display:none; }
@@ -3273,7 +3291,7 @@ select.fld {
 
   <!-- Edit Profile -->
   <div id="sh-edit-profile" class="ovl">
-    <div class="sh" style="max-height:95dvh;display:flex;flex-direction:column;">
+    <div class="sh" style="max-height:95dvh;display:flex;flex-direction:column;overflow:hidden;">
       <div class="sh-drag"></div>
       <div class="sh-top">
         <h3>My profile</h3>
