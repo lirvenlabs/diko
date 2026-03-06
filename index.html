@@ -1871,7 +1871,7 @@ window.updateEditAvatarPreview = function() {
 window.handleAvatarUpload = function(input) {
   const file = input.files[0];
   if (!file) return;
-  if (file.size > 10 * 1024 * 1024) { toast('Image too large (max 10 MB)'); return; }
+  if (file.size > 10 * 1024 * 1024) { toast('Image too large (max 2 MB)'); return; }
   const reader = new FileReader();
   reader.onload = async (e) => {
     const base64 = e.target.result;
@@ -2188,12 +2188,15 @@ html, body {
   height: 100%; width: 100%; overflow: hidden;
   background: var(--bg); font-family: var(--font-b);
   color: var(--ink); -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
 }
 
 #app {
   height: 100dvh; max-width: 430px; margin: 0 auto;
   display: flex; flex-direction: column; overflow: hidden;
   position: relative; background: var(--bg);
+  overscroll-behavior: none;
   box-shadow: 0 0 60px rgba(40,33,26,.10), 0 0 120px rgba(40,33,26,.04);
 }
 
@@ -3896,6 +3899,24 @@ window.renderProfile = (function(orig) {
   };
 })(window.renderProfile);
 </script>
+<script>
+// Empêche le pull-to-refresh et tout scroll du navigateur hors des zones autorisées
+document.addEventListener('touchmove', function(e) {
+  // Cherche si un ancêtre scrollable est dans notre app
+  let el = e.target;
+  let canScroll = false;
+  while (el && el !== document.body) {
+    const style = window.getComputedStyle(el);
+    const overflowY = style.overflowY;
+    const isScrollable = (overflowY === 'auto' || overflowY === 'scroll');
+    if (isScrollable && el.scrollHeight > el.clientHeight) {
+      canScroll = true;
+      break;
+    }
+    el = el.parentElement;
+  }
+  if (!canScroll) e.preventDefault();
+}, { passive: false });
+</script>
 </body>
 </html>
-
