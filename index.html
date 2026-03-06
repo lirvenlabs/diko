@@ -1871,7 +1871,7 @@ window.updateEditAvatarPreview = function() {
 window.handleAvatarUpload = function(input) {
   const file = input.files[0];
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) { toast('Image too large (max 2 MB)'); return; }
+  if (file.size > 10 * 1024 * 1024) { toast('Image too large (max 10 MB)'); return; }
   const reader = new FileReader();
   reader.onload = async (e) => {
     const base64 = e.target.result;
@@ -3898,3 +3898,4 @@ window.renderProfile = (function(orig) {
 </script>
 </body>
 </html>
+
