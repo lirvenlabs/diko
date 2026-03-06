@@ -95,7 +95,6 @@ window.getTotalWords = function() {
 
 window.isUnlocked = function(item) {
   if (item.unlock === 0) return true;
-  // Check permanent unlocks stored in user profile
   const permaKey = 'diko_unlocked_' + (window.FID||'');
   const unlocked = JSON.parse(localStorage.getItem(permaKey)||'[]');
   return unlocked.includes(item.id);
@@ -373,7 +372,7 @@ onAuthStateChanged(auth, async u => {
       loadVocab();
       startInboxListener();
       renderProfile();
-      loadSocial(); // charge favoris + utilisateurs en arrière-plan
+      loadFavorites(); // charge favoris silencieusement au login
     }
   } else {
     showScr('auth');
@@ -796,9 +795,7 @@ window.goToTopLang = function() {
 
 window.checkNewUnlocks = function(total) {
   if (!window.FID) return;
-  // Grant permanent unlocks based on CURRENT total
   _grantPermanentUnlocks(total);
-  // Notify only once per item
   const notifKey = 'diko_notified_' + window.FID;
   const notified = JSON.parse(localStorage.getItem(notifKey)||'[]');
   const permaKey = 'diko_unlocked_' + window.FID;
@@ -1186,6 +1183,41 @@ window.selectQuizMode = function(mode) {
 };
 
 // Render the quiz lang switcher (same dropdown system as vocab)
+window.renderQuizStats = async function() {
+  const lang = window._quizLang || window.currentLang;
+  if (!window.FID) return;
+
+  const wrap = document.getElementById('qz-last-session-wrap');
+  const card = document.getElementById('qz-last-card');
+  if (!wrap || !card) return;
+
+  try {
+    // Read doc with last 3 sessions for this language
+    const ref = doc(db, 'users', window.FID, 'quizHistory', lang);
+    const snap = await getDoc(ref);
+    const sessions = snap.exists() ? (snap.data().sessions || []) : [];
+
+    if (sessions.length > 0) {
+      wrap.style.display = 'flex';
+      card.innerHTML = sessions.map(s => {
+        const pct = Math.round((s.score / s.total) * 100);
+        const modeLabel = s.mode === 'flash' ? 'FC' : 'Written';
+        return `<div class="qz-session-row">
+          <div class="qz-session-circle">${pct}%</div>
+          <div class="qz-session-info">
+            <div class="qz-session-title">${s.score}/${s.total} · ${modeLabel}</div>
+            <div class="qz-session-date">${s.date}</div>
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      wrap.style.display = 'none';
+    }
+  } catch(e) {
+    wrap.style.display = 'none';
+  }
+};
+
 window.renderQuizLangSwitcher = function() {
   const bar = document.getElementById('lang-switcher-bar-q');
   if (!bar || !window.userLangs || window.userLangs.length === 0) return;
@@ -1213,7 +1245,7 @@ window.renderQuizLangSwitcher = function() {
       window._quizLang = lang;
       closeLangMenus();
       renderQuizLangSwitcher();
-
+      renderQuizStats();
       // Update slider max
       const words = (window._allLangsWords||[]).filter(w=>w.lang===lang);
       const max = words.length;
@@ -1273,6 +1305,7 @@ window.initQuiz = function() {
   document.getElementById('quiz-result').style.display = 'none';
 
   renderQuizLangSwitcher();
+  renderQuizStats();
   switchTab('quiz');
 };
 
@@ -1457,6 +1490,23 @@ window.showQuizResult = async function() {
     const bar = document.getElementById('res-bar');
     if (bar) bar.style.width = pct + '%';
   }, 80);
+
+  // Save session to Firestore (per account, per language)
+  try {
+    const lang = window._quizLang || window.currentLang;
+    const now = new Date();
+    const date = now.toLocaleDateString('en-US', { day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' });
+    if (window.FID) {
+      const ref = doc(db, 'users', window.FID, 'quizHistory', lang);
+      const snap = await getDoc(ref);
+      let sessions = snap.exists() ? (snap.data().sessions || []) : [];
+      sessions.unshift({ score: s.score, total: s.total, mode: s.mode, date });
+      sessions = sessions.slice(0, 3);
+      await setDoc(ref, { sessions });
+      // Rafraîchir l'affichage
+      renderQuizStats();
+    }
+  } catch(e) { console.error('Error sauvegarde session', e); }
 };
 
 // ────────────────────────────────
@@ -2117,37 +2167,57 @@ window.executeLangDelete = async function() {
 document.getElementById('btn-confirm-delete-account')?.addEventListener('click', async () => {
     const auth = getAuth();
     const user = auth.currentUser;
+    const db = getFirestore();
     if (!user) return;
-    // Toujours demander le mot de passe pour confirmer
-    closeSh('sh-delete-confirm');
-    document.getElementById('reauth-pwd-input').value = '';
-    openSh('sh-reauth');
 
-    const confirmBtn = document.getElementById('btn-reauth-confirm');
-    confirmBtn.onclick = async () => {
-        const pwd = document.getElementById('reauth-pwd-input').value;
-        if (!pwd) { toast('Please enter your password'); return; }
-        confirmBtn.innerText = "Deleting...";
-        confirmBtn.style.opacity = "0.7";
-        confirmBtn.style.pointerEvents = "none";
+    const btn = document.getElementById('btn-confirm-delete-account');
+
+    const tryDelete = async () => {
+        btn.innerText = "Deleting...";
+        btn.style.opacity = "0.7";
+        btn.style.pointerEvents = "none";
         try {
-            const credential = EmailAuthProvider.credential(user.email, pwd);
-            await reauthenticateWithCredential(user, credential);
-            const db = getFirestore();
             await deleteDoc(doc(db, "users", user.uid));
             await deleteUser(user);
             window.location.reload();
-        } catch(e) {
-            confirmBtn.innerText = "Delete account";
-            confirmBtn.style.opacity = "1";
-            confirmBtn.style.pointerEvents = "auto";
-            if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
-                toast('Incorrect password. Account not deleted.');
+        } catch (error) {
+            btn.innerText = "Yes, delete";
+            btn.style.opacity = "1";
+            btn.style.pointerEvents = "auto";
+            if (error.code === 'auth/requires-recent-login') {
+                // Ouvrir le sheet de confirmation de mot de passe
+                closeSh('sh-delete-confirm');
+                document.getElementById('reauth-pwd-input').value = '';
+                openSh('sh-reauth');
+
+                // Le bouton du sheet gère la suite
+                const confirmBtn = document.getElementById('btn-reauth-confirm');
+                confirmBtn.onclick = async () => {
+                    const pwd = document.getElementById('reauth-pwd-input').value;
+                    if (!pwd) return;
+                    confirmBtn.innerText = "Deleting...";
+                    confirmBtn.style.opacity = "0.7";
+                    confirmBtn.style.pointerEvents = "none";
+                    try {
+                        const credential = EmailAuthProvider.credential(user.email, pwd);
+                        await reauthenticateWithCredential(user, credential);
+                        await deleteDoc(doc(db, "users", user.uid));
+                        await deleteUser(user);
+                        window.location.reload();
+                    } catch(e) {
+                        confirmBtn.innerText = "Delete account";
+                        confirmBtn.style.opacity = "1";
+                        confirmBtn.style.pointerEvents = "auto";
+                        toast('Incorrect password. Account not deleted.', 'error');
+                    }
+                };
             } else {
-                toast('Error: ' + (e.code || e.message));
+                toast('Error deleting account. Please try again.', 'error');
             }
         }
     };
+
+    await tryDelete();
 });
 </script>
 
@@ -2197,10 +2267,11 @@ html, body {
 
 /* ── SCREENS & TABS ── */
 .screen { display: none; flex: 1; flex-direction: column; overflow: hidden; height: 100%; }
-.screen.on { display: flex; animation: fadeUp .28s cubic-bezier(.2,.8,.2,1); }
+.screen.on { display: flex; animation: fadeUp .22s cubic-bezier(.2,.8,.2,1); }
 .tab { display: none; flex: 1; flex-direction: column; overflow: hidden; }
-.tab.on { display: flex; animation: fadeUp .22s cubic-bezier(.2,.8,.2,1); }
-.scr { overflow-y: auto; overflow-x: hidden; padding-bottom: calc(var(--nav-h) + 20px); }
+.tab.on { display: flex; animation: fadeUp .18s cubic-bezier(.2,.8,.2,1); }
+.scr { overflow-y: auto; overflow-x: hidden; padding-bottom: calc(var(--nav-h) + 2px);
+  -webkit-overflow-scrolling: touch; will-change: scroll-position; }
 .scr::-webkit-scrollbar { display: none; }
 
 @keyframes fadeUp {
@@ -2369,11 +2440,12 @@ textarea.fld { resize: none; min-height: 100px; line-height: 1.6; }
 
 /* ── VOCAB CARDS — 3 lignes hauteur fixe ── */
 .v-grid { display: flex; flex-direction: column; gap: 8px; padding: 0 22px; }
+.vocab-scroll-zone { -webkit-overflow-scrolling: touch; will-change: scroll-position; }
 .vocab-scroll-zone::-webkit-scrollbar { display: none; }
 .w-card {
   background: var(--w); border-radius: var(--r2);
   padding: 12px 12px 12px 16px; box-shadow: var(--shadow);
-  cursor: pointer; transition: transform .12s, box-shadow .12s;
+  cursor: pointer; transition: transform .12s;
   display: flex; align-items: center; gap: 10px;
   min-height: 84px; border: 1px solid rgba(40,33,26,.04);
 }
@@ -2410,7 +2482,7 @@ textarea.fld { resize: none; min-height: 100px; line-height: 1.6; }
 /* ── SHEETS ── */
 .ovl { display: none; position: fixed; inset: 0; background: rgba(28,22,16,.45); z-index: 1000; opacity: 0; transition: opacity .28s; justify-content: center; align-items: flex-end; }
 .ovl.on { opacity: 1; }
-.sh { width: 100%; max-width: 430px; background: var(--w); border-radius: 28px 28px 0 0; transform: translateY(100%); transition: transform .32s cubic-bezier(.2,.8,.2,1); padding: 24px 22px 28px; max-height: 88vh; overflow-y: auto; border-top: 1px solid rgba(40,33,26,.06); }
+.sh { width: 100%; max-width: 430px; background: var(--w); border-radius: 28px 28px 0 0; transform: translateY(100%); transition: transform .28s cubic-bezier(.2,.8,.2,1); padding: 24px 22px 28px; max-height: 88vh; overflow-y: auto; border-top: 1px solid rgba(40,33,26,.06); }
 .ovl.on .sh { transform: translateY(0); }
 .sh::-webkit-scrollbar { display: none; }
 .sh-drag { width: 40px; height: 4px; background: var(--bg3); border-radius: 2px; margin: 0 auto 22px; opacity:.7; }
@@ -2502,15 +2574,15 @@ textarea.fld { resize: none; min-height: 100px; line-height: 1.6; }
 }
 .qz-setup-wrap::-webkit-scrollbar { display:none; }
 .qz-setup-inner {
-  flex:1; overflow:hidden; padding-bottom:4px;
+  flex:1; overflow:hidden; padding-bottom:calc(var(--nav-h) + 8px);
   display:flex; flex-direction:column;
 }
 .qz-setup-inner::-webkit-scrollbar { display:none; }
-.qz-section { padding:0 22px; margin-bottom:clamp(6px, 1.8vh, 16px); flex-shrink:0; }
+.qz-section { padding:0 22px; margin-bottom:14px; flex-shrink:0; }
 .qz-section-label {
   font-family:var(--font-b); font-size:11px; font-weight:700;
   text-transform:uppercase; letter-spacing:.1em; color:var(--ink4);
-  margin-bottom:8px;
+  margin-bottom:10px;
 }
 
 /* Mode cards */
@@ -2630,7 +2702,7 @@ input[type=range].quiz-slider::-moz-range-thumb {
   flex:1; display:flex; align-items:center; justify-content:center; gap:8px;
   padding:16px 12px; border-radius:var(--r2); border:none;
   font-family:var(--font-b); font-size:14px; font-weight:700;
-  cursor:pointer; transition:transform .12s, box-shadow .12s;
+  cursor:pointer; transition:transform .12s;
 }
 .fc-btn:active { transform:scale(.97); }
 .fc-nope { background:#D03838; color:#fff; box-shadow:0 4px 14px rgba(208,56,56,.3); }
@@ -2696,7 +2768,7 @@ input[type=range].quiz-slider::-moz-range-thumb {
 .soc-tab-btn.active { color:var(--acc); border-bottom-color:var(--acc); }
 
 /* Panes */
-.soc-pane { flex:1; overflow-y:auto; padding:16px 22px 12px; display:none; flex-direction:column; gap:10px; }
+.soc-pane { flex:1; overflow-y:auto; padding:16px 22px 12px; display:none; flex-direction:column; gap:10px; -webkit-overflow-scrolling:touch; will-change:scroll-position; }
 .soc-pane::-webkit-scrollbar { display:none; }
 #soc-user-list::-webkit-scrollbar { display:none; }
 
@@ -2779,10 +2851,9 @@ input[type=range].quiz-slider::-moz-range-thumb {
   flex-shrink:0; transition:background 1.2s ease;
   background:linear-gradient(160deg,#F2EAE0,#DEC9AE);
 }
-/* Zone scrollable home */
 .home-scroll-zone {
-  flex:1; overflow-y:auto; overflow-x:hidden;
-  padding-bottom:2px;
+  flex:1; overflow-y:auto; overflow-x:hidden; padding-bottom:2px;
+  -webkit-overflow-scrolling:touch; will-change:scroll-position;
 }
 .home-scroll-zone::-webkit-scrollbar { display:none; }
 /* Grain */
@@ -2858,7 +2929,7 @@ input[type=range].quiz-slider::-moz-range-thumb {
 .qt-add-tile {
   width:100%; display:flex; align-items:center; gap:14px;
   background:var(--w); border-radius:var(--r2); padding:15px 16px;
-  cursor:pointer; transition:transform .12s, box-shadow .12s;
+  cursor:pointer; transition:transform .12s;
   box-shadow:0 2px 12px rgba(0,0,0,.07); border:1.5px solid var(--bg2);
   position:relative; overflow:hidden;
 }
@@ -3291,7 +3362,7 @@ select.fld {
 
   <!-- Edit Profile -->
   <div id="sh-edit-profile" class="ovl">
-    <div class="sh" style="max-height:95dvh;display:flex;flex-direction:column;overflow:hidden;">
+    <div class="sh">
       <div class="sh-drag"></div>
       <div class="sh-top">
         <h3>My profile</h3>
@@ -3320,7 +3391,7 @@ select.fld {
       <label style="font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:block;">Username</label>
       <input type="text" id="edit-username" class="fld" placeholder="Your username">
 
-      <label style="font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:block;">Native language</label>
+      <label style="font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:block;">Language maternelle</label>
       <div class="custom-lang-dd" id="edit-native-dd" onclick="event.stopPropagation();renderLangDropdown('edit-native-dd', window._selectedNativeLang, (code,name)=>{ window._selectedNativeLang=code; document.getElementById('edit-native-trigger').innerHTML=`<span>${FLAGS[code]||'🌐'}</span><span>${name}</span><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' width='13' height='13'><polyline points='6 9 12 15 18 9'/></svg>`; })">
         <div class="cld-trigger" id="edit-native-trigger">
           <span>🇫🇷</span><span>French</span>
@@ -3329,7 +3400,7 @@ select.fld {
         <div class="cld-list"></div>
       </div>
 
-      <label style="font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:block;">Languages learned</label>
+      <label style="font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:block;">Languages apprises</label>
       <div id="edit-langs-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;"></div>
 
       <button class="btn btn-acc" onclick="saveProfile()">Save</button>
@@ -3499,8 +3570,8 @@ select.fld {
     <!-- TAB: HOME -->
     <div id="tab-home" class="tab on" style="overflow:hidden;padding-bottom:0;">
 
-      <!-- ── BANNIÈRE FIXE ── -->
-      <div class="home-banner" id="home-banner" style="flex-shrink:0;">
+      <!-- ── BANNIÈRE VITRINE ── -->
+      <div class="home-banner" id="home-banner">
         <!-- Grain texture -->
         <div class="home-banner-grain"></div>
         <!-- Vignette bas -->
@@ -3533,63 +3604,62 @@ select.fld {
         </div>
       </div>
 
-      <!-- ── CONTENU SCROLLABLE ── -->
-      <div class="home-scroll-zone">
+      <!-- ── 2 STAT CARDS ── -->
+      <div class="home-stats-2">
+        <div class="hs2-card hs2-total" onclick="switchTab('vocab')">
+          <div class="hs2-num" id="stat-words">0</div>
+          <div class="hs2-label">words collected</div>
+          <div class="hs2-sub">all languages</div>
+        </div>
+        <div class="hs2-card hs2-top" onclick="goToTopLang()" style="cursor:pointer;">
+          <div class="hs2-flag" id="stat-top-flag">🌐</div>
+          <div class="hs2-lang" id="stat-top-name">—</div>
+          <div class="hs2-count" id="stat-top-count">0 word</div>
+          <div class="hs2-sub">main language</div>
+        </div>
+      </div>
 
-        <!-- 2 STAT CARDS -->
-        <div class="home-stats-2">
-          <div class="hs2-card hs2-total" onclick="switchTab('vocab')">
-            <div class="hs2-num" id="stat-words">0</div>
-            <div class="hs2-label">words collected</div>
-            <div class="hs2-sub">all languages</div>
+      <!-- ── QUICK ACTIONS ── -->
+      <div class="home-section">
+        <div class="home-section-title" style="margin-bottom:10px;">Quick actions</div>
+
+        <!-- Add tile — full width -->
+        <div class="qt-add-tile" onclick="openAddWord();switchTab('vocab')">
+          <div class="qt-add-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><path d="M12 5v14M5 12h14"/></svg>
           </div>
-          <div class="hs2-card hs2-top" onclick="goToTopLang()" style="cursor:pointer;">
-            <div class="hs2-flag" id="stat-top-flag">🌐</div>
-            <div class="hs2-lang" id="stat-top-name">—</div>
-            <div class="hs2-count" id="stat-top-count">0 word</div>
-            <div class="hs2-sub">main language</div>
+          <div class="qt-add-text">
+            <div class="qt-add-label">Add a word</div>
+            <div class="qt-add-sub">Build your vocabulary</div>
           </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="flex-shrink:0;opacity:.5;color:var(--acc);"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
 
-        <!-- QUICK ACTIONS -->
-        <div class="home-section">
-          <div class="home-section-title" style="margin-bottom:10px;">Quick actions</div>
-          <div class="qt-add-tile" onclick="openAddWord();switchTab('vocab')">
-            <div class="qt-add-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><path d="M12 5v14M5 12h14"/></svg>
+        <!-- Quiz + Social side by side -->
+        <div class="quick-grid-2" style="margin-top:10px;">
+          <div class="quick-tile-2" onclick="initQuiz()">
+            <div class="qt2-icon" style="background:rgba(88,117,87,.14);color:#4A7548;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             </div>
-            <div class="qt-add-text">
-              <div class="qt-add-label">Add a word</div>
-              <div class="qt-add-sub">Build your vocabulary</div>
-            </div>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="flex-shrink:0;opacity:.5;color:var(--acc);"><polyline points="9 18 15 12 9 6"/></svg>
+            <div class="qt2-label">Quiz</div>
           </div>
-          <div class="quick-grid-2" style="margin-top:10px;">
-            <div class="quick-tile-2" onclick="initQuiz()">
-              <div class="qt2-icon" style="background:rgba(88,117,87,.14);color:#4A7548;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-              </div>
-              <div class="qt2-label">Quiz</div>
+          <div class="quick-tile-2" onclick="switchTab('social');loadSocial();">
+            <div class="qt2-icon" style="background:rgba(107,91,117,.14);color:#5E4E6B;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
             </div>
-            <div class="quick-tile-2" onclick="switchTab('social');loadSocial();">
-              <div class="qt2-icon" style="background:rgba(107,91,117,.14);color:#5E4E6B;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-              </div>
-              <div class="qt2-label">Social</div>
-            </div>
+            <div class="qt2-label">Social</div>
           </div>
         </div>
+      </div>
 
-        <!-- RECENTLY ADDED -->
-        <div class="home-section" style="padding-bottom:16px;">
-          <div class="home-section-header">
-            <div class="home-section-title">Recently added</div>
-            <button class="home-section-link" onclick="switchTab('vocab')">See all →</button>
-          </div>
-          <div id="home-recent-words" class="v-grid" style="padding:0;"></div>
+      <!-- ── RECENTLY ADDED — 4 words max, no scrollbar ── -->
+      <div class="home-section" style="flex:1;overflow:hidden;padding-bottom:0;">
+        <div class="home-section-header">
+          <div class="home-section-title">Recently added</div>
+          <button class="home-section-link" onclick="switchTab('vocab')">See all →</button>
         </div>
-
-      </div><!-- /home-scroll-zone -->
+        <div id="home-recent-words" class="v-grid" style="padding:0;"></div>
+      </div>
 
     </div>
 
@@ -3713,9 +3783,24 @@ select.fld {
         </div>
 
         <!-- Lancer -->
-        <div class="qz-section" style="margin-top:auto;padding-top:4px;padding-bottom:0;">
+        <div class="qz-section" style="margin-top:4px;">
           <button class="btn btn-acc" onclick="startQuiz()" style="width:100%;font-size:15px;padding:16px;">Start</button>
         </div>
+
+        <!-- Séparateur -->
+        <div style="padding:4px 22px 10px;flex-shrink:0;"><div style="height:1px;background:var(--bg3);border-radius:1px;"></div></div>
+
+        <!-- Spacer flexible — pousse les sessions vers le bas si peu de sessions -->
+        <div style="flex:1;min-height:8px;max-height:32px;"></div>
+
+        <!-- Recent sessions -->
+        <div class="qz-section qz-sessions-section" id="qz-last-session-wrap" style="display:none;flex-direction:column;">
+          <div class="qz-section-label">Recent sessions</div>
+          <div class="qz-sessions-list" id="qz-last-card"></div>
+        </div>
+
+        <!-- Spacer nav -->
+        <div style="flex-shrink:0;min-height:calc(var(--nav-h) + 8px);flex:1;max-height:calc(var(--nav-h) + 24px);"></div>
 
         </div><!-- /qz-setup-inner -->
       </div><!-- /quiz-setup -->
@@ -3869,7 +3954,7 @@ select.fld {
         <span>Vocab</span>
       </button>
       <button class="nb" data-tab="quiz" onclick="initQuiz()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17.01"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         <span>Quiz</span>
       </button>
       <button class="nb" data-tab="social" onclick="switchTab('social')">
