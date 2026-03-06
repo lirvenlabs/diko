@@ -1905,7 +1905,7 @@ window.handleAvatarUpload = function(input) {
 window.addLang = async function() {
   const lang = window._selectedAddLang;
   if (!lang) return toast('Choose a language');
-  if (window.userLangs.includes(lang)) return toast('Language déjà ajoutée');
+  if (window.userLangs.includes(lang)) return toast('Language already added');
   window.userLangs.push(lang);
   window.currentLang = lang;
   await updateDoc(doc(db, 'users', window.FID), { learningLangs: window.userLangs });
@@ -3901,3 +3901,4 @@ window.renderProfile = (function(orig) {
 </script>
 </body>
 </html>
+
