@@ -334,7 +334,7 @@ onAuthStateChanged(auth, async u => {
         _avatarColor: window.PALETTE[Math.floor(Math.random()*window.PALETTE.length)],
         nativeFlag: 'fr',
         learningLangs: ['en'],
-        tags: [{ id:'t1', name:'Nom', color:'#D97757' },{ id:'t2', name:'Verbe', color:'#EAC775' },{ id:'t3', name:'Expression', color:'#6B8E6B' }],
+        tags: [{ id:'t1', name:'Noun', color:'#D97757' },{ id:'t2', name:'Verb', color:'#EAC775' },{ id:'t3', name:'Expression', color:'#6B8E6B' }],
         bio: '',
         totalWords: 0,
         friends: [],
@@ -441,7 +441,7 @@ window.renderLangSwitcher = function() {
       const item = document.createElement('div');
       item.className = 'ls-item' + (lang === active ? ' active' : '');
       const canDelete = window.userLangs.length > 1;
-      item.innerHTML = `<span>${FLAGS[lang]||'🌐'}</span><span style="flex:1;">${LANG_NAMES[lang]||lang}</span>${canDelete ? `<button onclick="event.stopPropagation();closeLangMenus();confirmLangDelete('${lang}')" style="width:22px;height:22px;border-radius:50%;border:none;background:rgba(192,64,64,.1);color:#C04040;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;padding:0;margin-left:4px;" title="Delete cette langue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10" height="10"><path d="M18 6L6 18M6 6l12 12"/></svg></button>` : ''}`;
+      item.innerHTML = `<span>${FLAGS[lang]||'🌐'}</span><span style="flex:1;">${LANG_NAMES[lang]||lang}</span>${canDelete ? `<button onclick="event.stopPropagation();closeLangMenus();confirmLangDelete('${lang}')" style="width:22px;height:22px;border-radius:50%;border:none;background:rgba(192,64,64,.1);color:#C04040;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;padding:0;margin-left:4px;" title="Delete this language"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10" height="10"><path d="M18 6L6 18M6 6l12 12"/></svg></button>` : ''}`;
       item.onclick = (e) => { e.stopPropagation(); window.currentLang = lang; renderLangSwitcher(); loadVocab();  closeLangMenus(); };
       menu.appendChild(item);
     });
@@ -642,7 +642,7 @@ window.renderVocab = function() {
   });
 
   if (fl.length === 0) {
-    list.innerHTML = `<div class="ev"><div class="ev-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 6.25278V19.2528M12 6.25278C10.8321 5.47686 9.24649 5 7.5 5C5.75351 5 4.16789 5.47686 3 6.25278V19.2528C4.16789 18.4769 5.75351 18 7.5 18C9.24649 18 10.8321 18.4769 12 19.2528M12 6.25278C13.1679 5.47686 14.7535 5 16.5 5C18.2465 5 19.8321 5.47686 21 6.25278V19.2528C19.8321 18.4769 18.2465 18 16.5 18C14.7535 18 13.1679 18.4769 12 19.2528"/></svg></div><p>${window.vocabList.length === 0 ? 'No words pour cette langue.<br>Commencez à apprendre !' : 'No results.'}</p></div>`;
+    list.innerHTML = `<div class="ev"><div class="ev-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 6.25278V19.2528M12 6.25278C10.8321 5.47686 9.24649 5 7.5 5C5.75351 5 4.16789 5.47686 3 6.25278V19.2528C4.16789 18.4769 5.75351 18 7.5 18C9.24649 18 10.8321 18.4769 12 19.2528M12 6.25278C13.1679 5.47686 14.7535 5 16.5 5C18.2465 5 19.8321 5.47686 21 6.25278V19.2528C19.8321 18.4769 18.2465 18 16.5 18C14.7535 18 13.1679 18.4769 12 19.2528"/></svg></div><p>${window.vocabList.length === 0 ? 'No words for this language.<br>Start learning!' : 'No results.'}</p></div>`;
     return;
   }
 
@@ -801,7 +801,7 @@ window.renderRecentWords = function() {
   // All words across languages, sorted by date desc, max 5
   const all = [...(window._allLangsWords||[])].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,4);
   if (!all.length) {
-    container.innerHTML = `<div style="font-size:13px;color:var(--ink4);padding:6px 0;">No words encore. Commence à apprendre !</div>`;
+    container.innerHTML = `<div style="font-size:13px;color:var(--ink4);padding:6px 0;">No words yet. Start learning!</div>`;
     return;
   }
   container.innerHTML = '';
@@ -1063,7 +1063,7 @@ window.openChapter = function(id) {
   const sectList = document.getElementById('chapter-sections');
   sectList.innerHTML = '';
   if (!ch.sections || ch.sections.length === 0) {
-    sectList.innerHTML = `<div class="ev" style="padding:30px 0;"><p>Aucune section.</p></div>`;
+    sectList.innerHTML = `<div class="ev" style="padding:30px 0;"><p>No sections yet.</p></div>`;
   } else {
     ch.sections.forEach((s, i) => {
       const el = document.createElement('div');
@@ -1606,7 +1606,7 @@ window.renderSendWordList = function() {
   const words = (window._allLangsWords||[]).filter(w => w.lang === window._sendLang);
   list.innerHTML = '';
   if (words.length === 0) {
-    list.innerHTML = `<div style="padding:16px;text-align:center;color:var(--ink4);font-size:13px;">No words dans cette langue.</div>`;
+    list.innerHTML = `<div style="padding:16px;text-align:center;color:var(--ink4);font-size:13px;">No words in this language.</div>`;
     return;
   }
   words.forEach(w => {
@@ -3140,7 +3140,7 @@ select.fld {
       <div style="width:52px;height:52px;background:#FDE8E8;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
         <svg viewBox="0 0 24 24" fill="none" stroke="#B03030" stroke-width="2" width="24" height="24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       </div>
-      <h3 style="font-size:20px;font-weight:700;margin-bottom:8px;">Delete <span id="confirm-lang-name" style="color:var(--acc);">cette langue</span> ?</h3>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:8px;">Delete <span id="confirm-lang-name" style="color:var(--acc);"></span>?</h3>
       <p id="confirm-lang-desc" style="color:var(--ink3);margin-bottom:28px;font-size:14px;line-height:1.6;"></p>
       <div style="display:flex;gap:12px;">
         <button class="btn btn-ghost" onclick="closeSh('sh-confirm-lang')">Cancel</button>
@@ -3200,7 +3200,7 @@ select.fld {
         </div>
         <div class="cld-list"></div>
       </div>
-      <button class="btn btn-acc" onclick="addLang()">Ajouter cette langue</button>
+      <button class="btn btn-acc" onclick="addLang()">Add this language</button>
     </div>
   </div>
 
@@ -3317,7 +3317,7 @@ select.fld {
           <span style="font-size:12px;color:var(--ink4);">Tap the photo to change</span>
           <button id="btn-remove-avatar" onclick="removeAvatar()" style="display:none;align-items:center;gap:5px;padding:5px 12px;border-radius:50px;border:none;background:transparent;color:#C03030;font-size:12px;font-weight:600;font-family:var(--font-b);cursor:pointer;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            Delete la photo
+            Delete photo
           </button>
         </div>
       </div>
@@ -3325,7 +3325,7 @@ select.fld {
       <label style="font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:block;">Username</label>
       <input type="text" id="edit-username" class="fld" placeholder="Your username">
 
-      <label style="font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:block;">Language maternelle</label>
+      <label style="font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:block;">Native language</label>
       <div class="custom-lang-dd" id="edit-native-dd" onclick="event.stopPropagation();renderLangDropdown('edit-native-dd', window._selectedNativeLang, (code,name)=>{ window._selectedNativeLang=code; document.getElementById('edit-native-trigger').innerHTML=`<span>${FLAGS[code]||'🌐'}</span><span>${name}</span><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' width='13' height='13'><polyline points='6 9 12 15 18 9'/></svg>`; })">
         <div class="cld-trigger" id="edit-native-trigger">
           <span>🇫🇷</span><span>French</span>
@@ -3334,7 +3334,7 @@ select.fld {
         <div class="cld-list"></div>
       </div>
 
-      <label style="font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:block;">Languages apprises</label>
+      <label style="font-size:12px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:block;">Languages learned</label>
       <div id="edit-langs-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;"></div>
 
       <button class="btn btn-acc" onclick="saveProfile()">Save</button>
@@ -3718,7 +3718,7 @@ select.fld {
         </div>
 
         <!-- Lancer -->
-        <div class="qz-section" style="margin-top:auto;padding-top:4px;padding-bottom:0;">
+        <div class="qz-section" style="margin-top:auto;padding-top:12px;padding-bottom:20px;">
           <button class="btn btn-acc" onclick="startQuiz()" style="width:100%;font-size:15px;padding:16px;">Start</button>
         </div>
 
@@ -3784,7 +3784,7 @@ select.fld {
           </button>
         </div>
         <div id="fc-actions-flip" style="display:flex;">
-          <button class="btn btn-ghost" onclick="flipFlashcard()" style="flex:1;">Retourner la carte</button>
+          <button class="btn btn-ghost" onclick="flipFlashcard()" style="flex:1;">Flip card</button>
         </div>
       </div>
 
