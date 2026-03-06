@@ -2189,7 +2189,6 @@ html, body {
   background: var(--bg); font-family: var(--font-b);
   color: var(--ink); -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
 }
 
 #app {
@@ -2197,6 +2196,7 @@ html, body {
   display: flex; flex-direction: column; overflow: hidden;
   position: relative; background: var(--bg);
   overscroll-behavior: none;
+  touch-action: pan-x pan-y;
   box-shadow: 0 0 60px rgba(40,33,26,.10), 0 0 120px rgba(40,33,26,.04);
 }
 
@@ -3898,25 +3898,6 @@ window.renderProfile = (function(orig) {
     if (el) el.textContent = (u.learningLangs || []).length;
   };
 })(window.renderProfile);
-</script>
-<script>
-// Empêche le pull-to-refresh et tout scroll du navigateur hors des zones autorisées
-document.addEventListener('touchmove', function(e) {
-  // Cherche si un ancêtre scrollable est dans notre app
-  let el = e.target;
-  let canScroll = false;
-  while (el && el !== document.body) {
-    const style = window.getComputedStyle(el);
-    const overflowY = style.overflowY;
-    const isScrollable = (overflowY === 'auto' || overflowY === 'scroll');
-    if (isScrollable && el.scrollHeight > el.clientHeight) {
-      canScroll = true;
-      break;
-    }
-    el = el.parentElement;
-  }
-  if (!canScroll) e.preventDefault();
-}, { passive: false });
 </script>
 </body>
 </html>
