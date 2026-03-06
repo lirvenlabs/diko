@@ -36,7 +36,7 @@ window.currentLang = null;
 window.userLangs = [];
 window.grammarChapters = [];
 
-window.PALETTE = ['#D97757','#EAC775','#6B8E6B','#4A6B82','#8A827A','#C05A5A','#D19C75','#5B756C','#A68A6B','#6B5B75','#7B9E87','#4E7FA6','#B07CC6','#E8856A','#5C8A7A','#C4956A'];
+window.PALETTE = ['#D97757','#EAC775','#6B8E6B','#4A6B82','#8A827A','#C05A5A','#D19C75','#5B756C','#A68A6B','#6B5B75','#7B9E87','#4E7FA6','#B07CC6','#E8856A'];
 window.userTags = [];
 
 // ────────────────────────────────
@@ -2415,7 +2415,7 @@ textarea.fld { resize: none; min-height: 100px; line-height: 1.6; }
 /* ── SHEETS ── */
 .ovl { display: none; position: fixed; inset: 0; background: rgba(28,22,16,.45); z-index: 1000; opacity: 0; transition: opacity .28s; justify-content: center; align-items: flex-end; }
 .ovl.on { opacity: 1; }
-.sh { width: 100%; max-width: 430px; background: var(--w); border-radius: 28px 28px 0 0; transform: translateY(100%); transition: transform .32s cubic-bezier(.2,.8,.2,1); padding: 24px 22px 28px; max-height: 88vh; overflow-y: auto; border-top: 1px solid rgba(40,33,26,.06); }
+.sh { width: 100%; max-width: 430px; background: var(--w); border-radius: 28px 28px 0 0; transform: translateY(100%); transition: transform .32s cubic-bezier(.2,.8,.2,1); padding: 24px 22px 28px; max-height: 82dvh; overflow-y: auto; border-top: 1px solid rgba(40,33,26,.06); }
 .ovl.on .sh { transform: translateY(0); }
 .sh::-webkit-scrollbar { display: none; }
 .sh-drag { width: 40px; height: 4px; background: var(--bg3); border-radius: 2px; margin: 0 auto 22px; opacity:.7; }
@@ -2913,8 +2913,9 @@ input[type=range].quiz-slider::-moz-range-thumb {
    SHOP — PLEINE PAGE FULLSCREEN
 ════════════════════════════════ */
 #sh-shop .sh {
-  max-height:100vh; height:100vh; border-radius:0;
+  max-height:100dvh; height:100dvh; border-radius:0;
   display:flex; flex-direction:column;
+  padding-top: max(20px, env(safe-area-inset-top));
 }
 .shop-header { display:flex; align-items:center; justify-content:space-between; padding:20px 20px 0; flex-shrink:0; }
 .shop-title { font-family:var(--font-d); font-size:22px; font-weight:800; letter-spacing:-.4px; }
@@ -3073,7 +3074,7 @@ select.fld {
 .cld-name { flex: 1; }
 
 /* ── CHAPTER SHEET ── */
-#sh-chapter .sh { max-height: 96vh; }
+#sh-chapter .sh { max-height: 92dvh; }
 .chapter-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
 .chapter-header h2 { font-family: var(--font-d); font-size: 22px; font-weight: 700; }
 
