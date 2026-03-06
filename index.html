@@ -1249,7 +1249,6 @@ window.initQuiz = function() {
   document.getElementById('quiz-result').style.display = 'none';
 
   renderQuizLangSwitcher();
-  renderQuizStats();
   switchTab('quiz');
 };
 
@@ -2779,7 +2778,7 @@ input[type=range].quiz-slider::-moz-range-thumb {
 /* Zone scrollable home */
 .home-scroll-zone {
   flex:1; overflow-y:auto; overflow-x:hidden;
-  padding-bottom:calc(var(--nav-h) + 8px);
+  padding-bottom:calc(var(--nav-h) + 2px);
 }
 .home-scroll-zone::-webkit-scrollbar { display:none; }
 /* Grain */
@@ -3866,7 +3865,7 @@ select.fld {
         <span>Vocab</span>
       </button>
       <button class="nb" data-tab="quiz" onclick="initQuiz()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17.01"/></svg>
         <span>Quiz</span>
       </button>
       <button class="nb" data-tab="social" onclick="switchTab('social')">
